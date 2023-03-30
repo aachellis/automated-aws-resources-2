@@ -2,10 +2,13 @@ import aws_cdk
 import aws_cdk.aws_lambda as lambda_
 import aws_cdk.aws_glue as glue 
 import aws_cdk.aws_iam as iam
+import aws_cdk.aws_stepfunctions as sfn
 import os
 import boto3
 import shutil
 from staging import bucket_name
+
+from task_utils.utility import create_glue_job_task, create_invoke_lambda
 
 s3 = boto3.client("s3", region_name=os.getenv('CDK_DEFAULT_REGION'))
 
@@ -42,7 +45,7 @@ def create_aws_resources(stack, conf, conf_name):
                 worker_type=configuration.get("properties", {}).get("worker_type", "G.1X"),
                 role=stack.role.role_arn,
             )
-            stack.add_resource(resource["name"], glue_job)
+            stack.add_resource(resource["name"], glue_job, "glue_job")
 
         if resource["type"] == "lambda_function":
             configuration = resource["configuration"]
@@ -63,7 +66,42 @@ def create_aws_resources(stack, conf, conf_name):
             principal = iam.ArnPrincipal(stack.role.role_arn)
 
             lambda_function.add_permission(f'{conf_name}-{resource.get("name")}-role', principal=principal, action="lambda:*")
-            stack.add_resource(resource["name"], lambda_function)
+            stack.add_resource(resource["name"], lambda_function, "lambda_function")
 
 def create_step_function(stack, conf, conf_name):
-    pass
+    parallels = []
+    for state in conf["states"]:
+        if len(state["jobs"]) == 1:
+            job = state["jobs"][0]
+            job_conf = stack.get_resource(job["name"])
+            if job_conf[1] == "glue_job":
+                task = create_glue_job_task(stack, conf_name, job_conf[0])
+            elif job_conf[1] == "lambda_function":
+                task = create_invoke_lambda(stack, conf_name, job_conf[0])
+            parallels.append(task)
+        else:
+            parallel = sfn.Parallel(stack, state["name"], result_path=sfn.JsonPath.DISCARD, comment=state.get("comment", "job Stage"))
+            for job in state["jobs"]:
+                job_conf = stack.get_resource(job["name"])
+                if job_conf[1] == "glue_job":
+                    task = create_glue_job_task(stack, conf_name, job_conf[0])
+                elif job_conf[1] == "lambda_function":
+                    task = create_invoke_lambda(stack, conf_name, job_conf[0])
+                parallel.branch(task)
+                
+            parallels.append(parallel)
+
+    definition = parallels[0]
+    if len(parallels) > 1:
+        for item in reversed(parallels[1:]):
+            definition = definition.next(item)
+
+    machine = sfn.StateMachine(
+        stack, 
+        conf_name,
+        definition=definition,
+        role=stack.role
+    )
+
+    stack.resources["state_machine"] = machine
+

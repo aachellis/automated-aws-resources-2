@@ -25,13 +25,24 @@
             }
         }
     ],
-    "states": {
-        "name": "my_step",
-        "jobs": [
-            {
-                "name": "my_glue_job",
-                "entity": "my_glue_job"
-            }
-        ] 
-    }
+    "states": [
+        {
+            "name": "my_step",
+            "jobs": [
+                {
+                    "name": "my_glue_job",
+                    "entity": "my_glue_job"
+                }
+            ]
+        },
+        {
+            "name": "next_step",
+            "jobs": [
+                {
+                    "name": "my_lambda_function",
+                    "entity": "my_lambda_function"
+                }
+            ] 
+        }
+    ]
 }

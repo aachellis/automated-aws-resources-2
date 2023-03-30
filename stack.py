@@ -16,12 +16,17 @@ class AutomatedPipelineStack(Stack):
             assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
         )
         self.role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("AdministratorAccess"))
+        self.role.grant_assume_role(iam.ServicePrincipal("lambda.amazonaws.com"))
+        self.role.grant_assume_role(iam.ServicePrincipal("states.amazonaws.com"))
 
         self.create_aws_resources(conf, conf_name) 
         self.create_step_function(conf, conf_name)
 
-    def add_resource(self, name, resource):
-        self.resources[name] = resource
+    def add_resource(self, name, resource, type):
+        self.resources[name] = (resource, type)
+
+    def get_resource(self, name):
+        return self.resources[name]
         
     def create_aws_resources(self, conf, conf_name):
         create_aws_resources(self, conf, conf_name) 
