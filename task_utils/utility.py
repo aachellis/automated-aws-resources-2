@@ -4,7 +4,8 @@ import aws_cdk.aws_stepfunctions_tasks as tasks
 def create_glue_job_task(stack, name, glue_job):
     return tasks.GlueStartJobRun(
         stack, name + "-" + glue_job.name + "-task",
-        glue_job_name = glue_job.name
+        glue_job_name = glue_job.name,
+        integration_pattern=sfn.IntegrationPattern.RUN_JOB
     ) 
 
 def create_invoke_lambda(stack, name, function):

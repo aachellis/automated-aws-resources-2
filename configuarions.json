@@ -15,6 +15,16 @@
             }
         },
         {
+            "name": "my_glue_job_2",
+            "type": "glue_job",
+            "configuration": {
+                "glue_version": "3.0",
+                "worker_type": "Standard",
+                "num_workers": 2,
+                "working_directory": "my_glue_job_2"
+            }
+        },
+        {
             "name": "my_glue_job",
             "type": "glue_job",
             "configuration": {
@@ -32,17 +42,21 @@
                 {
                     "name": "my_glue_job",
                     "entity": "my_glue_job"
+                },
+                {
+                    "name": "my_glue_job_2",
+                    "entity": "my_glue_job_2"
                 }
             ]
         },
         {
-            "name": "next_step",
+            "name": "lambda_step",
             "jobs": [
                 {
                     "name": "my_lambda_function",
                     "entity": "my_lambda_function"
                 }
-            ] 
+            ]
         }
     ]
 }

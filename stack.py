@@ -13,11 +13,13 @@ class AutomatedPipelineStack(Stack):
 
         self.role = iam.Role(
             self, "my-role",
-            assumed_by=iam.ServicePrincipal("glue.amazonaws.com"),
+            assumed_by=iam.CompositePrincipal(
+                iam.ServicePrincipal("glue.amazonaws.com"), 
+                iam.ServicePrincipal("lambda.amazonaws.com"), 
+                iam.ServicePrincipal("states.amazonaws.com")
+            ),
         )
         self.role.add_managed_policy(iam.ManagedPolicy.from_aws_managed_policy_name("AdministratorAccess"))
-        self.role.grant_assume_role(iam.ServicePrincipal("lambda.amazonaws.com"))
-        self.role.grant_assume_role(iam.ServicePrincipal("states.amazonaws.com"))
 
         self.create_aws_resources(conf, conf_name) 
         self.create_step_function(conf, conf_name)
