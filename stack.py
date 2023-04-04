@@ -2,7 +2,8 @@ from aws_cdk import Stack
 import aws_cdk.aws_s3 as s3
 import aws_cdk.aws_iam as iam
 import uuid
-from utils.utility import create_aws_resources, create_step_function
+from utils.utility import create_aws_resources
+from task_utils.utility import create_step_function
 
 class AutomatedPipelineStack(Stack):
 
