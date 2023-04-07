@@ -19,6 +19,12 @@ def create_aws_resources(stack, conf, conf_name):
             s3.upload_file("glue_helper.zip", bucket_name, "glue_jobs/" + configuration["working_directory"] + "/glue_helper.zip")
             s3.upload_file(os.path.join("glue_jobs", configuration["working_directory"], "glue_main.py"), bucket_name, "glue_jobs/" + configuration["working_directory"] + "/glue_main.py")
 
+            extra_jars = []
+            if "extra_jars" in configuration:
+                for jar in configuration["extra_jars"].split(","):
+                    s3.upload_file(os.path.join("jars", jar), bucket_name, f"glue_jobs/{configuration['working_directory']}/jars/{jar}")
+                    extra_jars.append(f"s3://{bucket_name}/glue_jobs/{configuration['working_directory']}/jars/{jar}")
+
             glue_job = glue.CfnJob(
                 stack,
                 f'{conf_name}-{resource.get("name")}',
@@ -34,7 +40,8 @@ def create_aws_resources(stack, conf, conf_name):
                     "--enable-metrics": "",
                     "--enable-continuous-cloudwatch-log": "true",
                     "--BUCKET_NAME": f"{bucket_name}",
-                    "--ISGLUERUNTIME": "True"
+                    "--ISGLUERUNTIME": "True",
+                    "--extra-jars": ','.join(extra_jars)
                 },
                 timeout=int(configuration.get("timeout", 20)),
                 glue_version=configuration.get("glue_version", "2.0"),

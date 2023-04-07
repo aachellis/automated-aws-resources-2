@@ -1,10 +1,11 @@
 import sys
+import random
 
 from awsglue.context import GlueContext
 from awsglue.job import Job
 from awsglue.utils import getResolvedOptions
 from pyspark import SparkContext, SparkConf
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, functions as f
 
 from utility.utils import get_data
 
@@ -15,6 +16,31 @@ sparkConf = SparkConf().setAppName("GlueJob")\
 glueContext = GlueContext(SparkContext.getOrCreate(sparkConf))
 spark = glueContext.spark_session                    
 
-df = get_data(spark, 20)
+data_list = []
+for i in range(200):
+    data_list.append({
+        'id': i,
+        'rank': random.randrange(200)
+    })
 
-print(df.show())
+df = spark.createDataFrame(data_list).withColumn("ts", f.current_timestamp())
+
+hudi_options = {
+    'hoodie.table.name': "tableName",
+    'hoodie.datasource.write.recordkey.field': 'id',
+    'hoodie.datasource.write.partitionpath.field': 'partitionpath',
+    'hoodie.datasource.write.table.name': "tableName",
+    'hoodie.datasource.write.operation': 'upsert',
+    'hoodie.datasource.write.precombine.field': 'ts',
+    'hoodie.upsert.shuffle.parallelism': 2,
+    'hoodie.insert.shuffle.parallelism': 2
+}
+
+(
+    df
+    .write
+    .mode("overwrite")
+    .format("hudi")
+    .options(**hudi_options)
+    .save("s3://sample-pipeline/output_data")
+)
