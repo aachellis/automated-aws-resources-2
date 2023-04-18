@@ -3,12 +3,14 @@ import aws_cdk.aws_lambda as lambda_
 import aws_cdk.aws_glue as glue 
 import aws_cdk.aws_iam as iam
 import aws_cdk.aws_stepfunctions as sfn
+import aws_cdk.aws_s3 as s3
+import aws_cdk.aws_s3_notifications as s3n
 import os
 import boto3
 import shutil
 from staging import bucket_name
 
-s3 = boto3.client("s3", region_name=os.getenv('CDK_DEFAULT_REGION'))
+s3_client = boto3.client("s3", region_name=os.getenv('CDK_DEFAULT_REGION'))
 
 def create_aws_resources(stack, conf, conf_name):
     for resource in conf["resources"]:
@@ -16,13 +18,13 @@ def create_aws_resources(stack, conf, conf_name):
             configuration = resource["configuration"]
 
             shutil.make_archive("glue_helper", "zip", os.path.join("glue_jobs", configuration["working_directory"]))
-            s3.upload_file("glue_helper.zip", bucket_name, "glue_jobs/" + configuration["working_directory"] + "/glue_helper.zip")
-            s3.upload_file(os.path.join("glue_jobs", configuration["working_directory"], "glue_main.py"), bucket_name, "glue_jobs/" + configuration["working_directory"] + "/glue_main.py")
+            s3_client.upload_file("glue_helper.zip", bucket_name, "glue_jobs/" + configuration["working_directory"] + "/glue_helper.zip")
+            s3_client.upload_file(os.path.join("glue_jobs", configuration["working_directory"], "glue_main.py"), bucket_name, "glue_jobs/" + configuration["working_directory"] + "/glue_main.py")
 
             extra_jars = []
             if "extra_jars" in configuration:
                 for jar in configuration["extra_jars"].split(","):
-                    s3.upload_file(os.path.join("jars", jar), bucket_name, f"glue_jobs/{configuration['working_directory']}/jars/{jar}")
+                    s3_client.upload_file(os.path.join("jars", jar), bucket_name, f"glue_jobs/{configuration['working_directory']}/jars/{jar}")
                     extra_jars.append(f"s3://{bucket_name}/glue_jobs/{configuration['working_directory']}/jars/{jar}")
 
             glue_job = glue.CfnJob(
@@ -56,7 +58,7 @@ def create_aws_resources(stack, conf, conf_name):
             configuration = resource["configuration"]
 
             shutil.make_archive("lambda_zip", "zip", os.path.join("glue_jobs", configuration["working_directory"]))
-            s3.upload_file("lambda_zip.zip", bucket_name, "lambda_functions/" + configuration["working_directory"] + "/lambda_zip.zip")
+            s3_client.upload_file("lambda_zip.zip", bucket_name, "lambda_functions/" + configuration["working_directory"] + "/lambda_zip.zip")
 
             lambda_function = lambda_.Function(
                 stack,
@@ -71,6 +73,32 @@ def create_aws_resources(stack, conf, conf_name):
             principal = iam.ArnPrincipal(stack.role.role_arn)
 
             lambda_function.add_permission(f'{conf_name}-{resource.get("name")}-role', principal=principal, action="lambda:*")
+
+            if "s3_notification" in resource:
+                has_filter = False
+                filters = {}
+                bucket = s3.Bucket.from_bucket_attributes(stack, "ImportedBucket",
+                    bucket_arn=f"arn:aws:s3:::{resource['s3_notification']['bucket_name']}"
+                )
+
+                if "prefix" in resource["s3_notification"]:
+                    has_filter = True 
+                    filters["prefix"] = resource["s3_notification"]["prefix"]
+                
+                if "suffix" in resource["s3_notification"]:
+                    has_filter = True 
+                    filters["suffix"] = resource["s3_notification"]["suffix"]
+
+                if not has_filter:
+                    bucket.add_event_notification(
+                        s3.EventType.OBJECT_CREATED, 
+                        s3n.LambdaDestination(lambda_function)
+                    )
+                else:
+                    bucket.add_event_notification(
+                        s3.EventType.OBJECT_CREATED, 
+                        s3n.LambdaDestination(lambda_function), 
+                        s3.NotificationKeyFilter(**filters)
+                    )
+
             stack.add_resource(resource["name"], lambda_function, "lambda_function")
-
-

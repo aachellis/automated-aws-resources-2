@@ -1,5 +1,6 @@
 import sys
 import random
+import boto3
 
 from awsglue.context import GlueContext
 from awsglue.job import Job
@@ -14,7 +15,10 @@ sparkConf = SparkConf().setAppName("GlueJob")\
                     .set("spark.sql.hive.convertMetastoreParquet", "false")
 
 glueContext = GlueContext(SparkContext.getOrCreate(sparkConf))
-spark = glueContext.spark_session                    
+spark = glueContext.spark_session     
+
+ssm = boto3.client('ssm')
+bucket_name = ssm.get_parameter(Name="/sample-pipeline/bucket-name")['Parameter']['Value']
 
 data_list = []
 for i in range(200):
@@ -42,5 +46,5 @@ hudi_options = {
     .mode("overwrite")
     .format("hudi")
     .options(**hudi_options)
-    .save("s3://sample-pipeline/output_data")
+    .save(f"s3://{bucket_name}/output_data")
 )

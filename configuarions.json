@@ -12,6 +12,11 @@
                 "handler": "handler",
                 "runtime": "python3.9",
                 "timeout": 3
+            },
+            "s3_notification": {
+                "bucket_name": "sample-notification-bucket-aachellis-v2",
+                "prefix": "landing",
+                "suffix": ".json"
             }
         },
         {
@@ -23,27 +28,12 @@
                 "num_workers": 2,
                 "working_directory": "my_glue_job_2"
             }
-        },
-        {
-            "name": "my_glue_job",
-            "type": "glue_job",
-            "configuration": {
-                "glue_version": "3.0",
-                "worker_type": "Standard",
-                "num_workers": 2,
-                "working_directory": "my_glue_job",
-                "extra_jars": "hudi-spark3-bundle_2.12-0.8.0.jar"
-            }
         }
     ],
     "states": [
         {
             "name": "my_step",
             "jobs": [
-                {
-                    "name": "my_glue_job",
-                    "entity": "my_glue_job"
-                },
                 {
                     "name": "my_glue_job_2",
                     "entity": "my_glue_job_2"
